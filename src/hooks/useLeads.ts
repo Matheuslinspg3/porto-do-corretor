@@ -37,6 +37,56 @@ export const TEMPERATURES = [
   { id: 'prioridade', label: 'Prioridade Máxima', color: 'text-red-500' },
 ] as const;
 
+const LEAD_RLS_ERROR_DESCRIPTION =
+  'Não foi possível salvar o lead por falta de permissão ou organização inválida. Atualize a página e tente novamente.';
+
+const isRlsError = (error: unknown) => {
+  const e = error as {
+    code?: string;
+    status?: number;
+    message?: string;
+    details?: string;
+    hint?: string;
+  } | null;
+
+  const errorText = [e?.message, e?.details, e?.hint].filter(Boolean).join(' ');
+
+  return (
+    e?.code === '42501' ||
+    e?.code === '23514' ||
+    e?.status === 401 ||
+    e?.status === 403 ||
+    /row-level security|permission denied|not authorized|Only organization managers|Broker does not belong|Broker role is not eligible/i.test(errorText)
+  );
+};
+
+const logLeadMutationDenied = ({
+  mutation,
+  operation,
+  error,
+  orgId,
+  userId,
+}: {
+  mutation: 'createLead' | 'updateLead';
+  operation: 'insert' | 'update';
+  error: unknown;
+  orgId?: string | null;
+  userId?: string;
+}) => {
+  const e = error as { code?: string; status?: number; hint?: string } | null;
+
+  console.error('[leads] RLS denied', {
+    mutation,
+    table: 'leads',
+    operation,
+    code: e?.code,
+    status: e?.status,
+    hint: e?.hint,
+    orgId,
+    userId,
+  });
+};
+
 export type CreateLeadInput = {
   name: string;
   phone?: string;
@@ -269,6 +319,19 @@ export function useLeads() {
       toast({ title: 'Lead criado', description: 'O lead foi criado com sucesso.' });
     },
     onError: (error) => {
+      if (isRlsError(error)) {
+        toast({ title: 'Permissão negada', description: LEAD_RLS_ERROR_DESCRIPTION, variant: 'destructive' });
+        logLeadMutationDenied({
+          mutation: 'createLead',
+          table: 'leads',
+          operation: 'insert',
+          error,
+          orgId: profile?.organization_id,
+          userId: user?.id,
+        } as any);
+        return;
+      }
+
       toast({ title: 'Erro ao criar lead', description: error.message, variant: 'destructive' });
     },
   });
@@ -293,6 +356,19 @@ export function useLeads() {
       toast({ title: 'Lead atualizado', description: 'O lead foi atualizado com sucesso.' });
     },
     onError: (error) => {
+      if (isRlsError(error)) {
+        toast({ title: 'Permissão negada', description: LEAD_RLS_ERROR_DESCRIPTION, variant: 'destructive' });
+        logLeadMutationDenied({
+          mutation: 'updateLead',
+          table: 'leads',
+          operation: 'update',
+          error,
+          orgId: profile?.organization_id,
+          userId: user?.id,
+        } as any);
+        return;
+      }
+
       toast({ title: 'Erro ao atualizar lead', description: error.message, variant: 'destructive' });
     },
   });
@@ -381,7 +457,7 @@ export function useLeads() {
   const bulkDeleteLeads = useMutation({
     mutationFn: async (ids: string[]) => {
       // Soft-delete to prevent sync re-creation (RD Station / Meta)
-      const { error } = await supabase.from('leads').update({ is_active: false }).in('id', ids);
+      const { error } = supabase.from('leads').update({ is_active: false }).in('id', ids);
       if (error) throw error;
     },
     onMutate: async (ids) => {
