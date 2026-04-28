@@ -323,12 +323,11 @@ export function useLeads() {
         toast({ title: 'Permissão negada', description: LEAD_RLS_ERROR_DESCRIPTION, variant: 'destructive' });
         logLeadMutationDenied({
           mutation: 'createLead',
-          table: 'leads',
           operation: 'insert',
           error,
           orgId: profile?.organization_id,
           userId: user?.id,
-        } as any);
+        });
         return;
       }
 
@@ -360,12 +359,11 @@ export function useLeads() {
         toast({ title: 'Permissão negada', description: LEAD_RLS_ERROR_DESCRIPTION, variant: 'destructive' });
         logLeadMutationDenied({
           mutation: 'updateLead',
-          table: 'leads',
           operation: 'update',
           error,
           orgId: profile?.organization_id,
           userId: user?.id,
-        } as any);
+        });
         return;
       }
 
@@ -457,7 +455,7 @@ export function useLeads() {
   const bulkDeleteLeads = useMutation({
     mutationFn: async (ids: string[]) => {
       // Soft-delete to prevent sync re-creation (RD Station / Meta)
-      const { error } = supabase.from('leads').update({ is_active: false }).in('id', ids);
+      const { error } = await supabase.from('leads').update({ is_active: false }).in('id', ids);
       if (error) throw error;
     },
     onMutate: async (ids) => {
