@@ -11,6 +11,7 @@ export type Lead = Tables<'leads'> & {
   property?: { id: string; title: string } | null;
   broker?: { id: string; full_name: string } | null;
   interested_property_type?: Tables<'property_types'> | null;
+  last_editor_name?: string | null;
 };
 
 export { type LeadStage } from '@/hooks/useLeadStages';
@@ -59,6 +60,7 @@ export type CreateLeadInput = {
   preferred_neighborhoods?: string[];
   preferred_cities?: string[];
   additional_requirements?: string;
+  is_draft?: boolean;
 };
 
 export type UpdateLeadInput = Partial<CreateLeadInput> & { id: string };
@@ -200,10 +202,24 @@ export function useLeads() {
         }
       }
       
+      // Buscar nomes de quem editou por último (para rascunhos/lista)
+      const editorIds = [...new Set(data.filter(l => l.last_edited_by).map(l => l.last_edited_by!))];
+      let editorsMap: Record<string, string | null> = {};
+      if (editorIds.length > 0) {
+        const { data: editors } = await supabase
+          .from('profiles')
+          .select('user_id, full_name')
+          .in('user_id', editorIds);
+        if (editors) {
+          editorsMap = Object.fromEntries(editors.map(e => [e.user_id, e.full_name]));
+        }
+      }
+
       const mapped = data.map(lead => ({
         ...lead,
         property: lead.property_id ? propertiesMap[lead.property_id] || null : null,
         broker: lead.broker_id ? brokersMap[lead.broker_id] || null : null,
+        last_editor_name: lead.last_edited_by ? editorsMap[lead.last_edited_by] ?? null : null,
       })) as Lead[];
 
       // Brokers only see their own leads
@@ -252,6 +268,7 @@ export function useLeads() {
           ...rest,
           organization_id: profile.organization_id,
           created_by: user.id,
+          last_edited_by: user.id,
           lead_stage_id: lead_stage_id || defaultStageId,
           stage: 'novo', // keep old column satisfied (NOT NULL)
         })
@@ -277,7 +294,7 @@ export function useLeads() {
     mutationFn: async ({ id, ...input }: UpdateLeadInput) => {
       const { data, error } = await supabase
         .from('leads')
-        .update(input)
+        .update({ ...input, last_edited_by: user?.id })
         .eq('id', id)
         .select(`
           *,

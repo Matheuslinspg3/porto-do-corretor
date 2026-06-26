@@ -12,6 +12,7 @@ export type PropertyImage = Tables<'property_images'>;
 export interface PropertyWithDetails extends Property {
   property_type: PropertyType | null;
   images: PropertyImage[];
+  last_editor_name?: string | null;
 }
 
 export type PropertyFormData = Omit<TablesInsert<'properties'>, 'id' | 'created_at' | 'updated_at' | 'organization_id' | 'created_by'>;
@@ -102,6 +103,28 @@ export function useProperties() {
         }
       }
 
+      // Enriquecer com o nome de quem editou por último (para rascunhos/lista)
+      const editorIds = Array.from(
+        new Set(
+          allData
+            .map((p) => (p as Property).last_edited_by)
+            .filter((id): id is string => !!id)
+        )
+      );
+      if (editorIds.length > 0) {
+        const { data: editors } = await supabase
+          .from('profiles')
+          .select('user_id, full_name')
+          .in('user_id', editorIds);
+        const editorMap = Object.fromEntries(
+          (editors || []).map((e) => [e.user_id, e.full_name])
+        );
+        for (const p of allData) {
+          const eid = (p as Property).last_edited_by;
+          p.last_editor_name = eid ? editorMap[eid] ?? null : null;
+        }
+      }
+
       return allData;
     },
     enabled: !!user && !!profile?.organization_id,
@@ -119,6 +142,7 @@ export function useProperties() {
           ...propertyData,
           organization_id: profile.organization_id,
           created_by: user!.id,
+          last_edited_by: user!.id,
         })
         .select()
         .single();
@@ -311,7 +335,7 @@ export function useProperties() {
     mutationFn: async ({ id, data, images, ownerData }: { id: string; data: TablesUpdate<'properties'>; images?: ImageData[]; ownerData?: OwnerData }) => {
       const { data: updated, error } = await supabase
         .from('properties')
-        .update(data)
+        .update({ ...data, last_edited_by: user!.id })
         .eq('id', id)
         .select()
         .single();

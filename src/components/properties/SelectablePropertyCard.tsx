@@ -79,6 +79,16 @@ export function SelectablePropertyCard({
       onTouchMove={isMobile ? handleTouchMove : undefined}
       onClickCapture={handleCardClick}
     >
+      {/* Badge de rascunho */}
+      {(property as any).is_draft && (
+        <div className="absolute top-3 right-3 z-10 rounded-md bg-amber-500/90 px-2 py-1 text-xs font-semibold text-white shadow-md backdrop-blur-sm">
+          Rascunho
+          {(property as any).last_editor_name && (
+            <span className="ml-1 font-normal opacity-90">· {(property as any).last_editor_name}</span>
+          )}
+        </div>
+      )}
+
       {/* Checkbox overlay */}
       <div 
         className={cn(

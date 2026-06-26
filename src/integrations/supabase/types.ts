@@ -1425,6 +1425,8 @@ export type Database = {
           broker_id: string | null
           created_at: string
           created_by: string
+          is_draft: boolean
+          last_edited_by: string | null
           email: string | null
           estimated_value: number | null
           external_id: string | null
@@ -1463,6 +1465,8 @@ export type Database = {
           broker_id?: string | null
           created_at?: string
           created_by: string
+          is_draft?: boolean
+          last_edited_by?: string | null
           email?: string | null
           estimated_value?: number | null
           external_id?: string | null
@@ -1501,6 +1505,8 @@ export type Database = {
           broker_id?: string | null
           created_at?: string
           created_by?: string
+          is_draft?: boolean
+          last_edited_by?: string | null
           email?: string | null
           estimated_value?: number | null
           external_id?: string | null
@@ -2251,6 +2257,8 @@ export type Database = {
           condominium_fee: number | null
           created_at: string
           created_by: string
+          is_draft: boolean
+          last_edited_by: string | null
           description: string | null
           description_generated: boolean | null
           development_name: string | null
@@ -2319,6 +2327,8 @@ export type Database = {
           condominium_fee?: number | null
           created_at?: string
           created_by: string
+          is_draft?: boolean
+          last_edited_by?: string | null
           description?: string | null
           description_generated?: boolean | null
           development_name?: string | null
@@ -2387,6 +2397,8 @@ export type Database = {
           condominium_fee?: number | null
           created_at?: string
           created_by?: string
+          is_draft?: boolean
+          last_edited_by?: string | null
           description?: string | null
           description_generated?: boolean | null
           development_name?: string | null
