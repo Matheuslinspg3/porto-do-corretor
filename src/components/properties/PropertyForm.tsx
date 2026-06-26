@@ -6,6 +6,7 @@ import {
   Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle,
 } from "@/components/ui/dialog";
 import { Form } from "@/components/ui/form";
+import { UnsavedChangesDialog } from "@/components/common/UnsavedChangesDialog";
 import { Button } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
@@ -102,7 +103,7 @@ interface PropertyFormProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   property?: PropertyWithDetails | null;
-  onSubmit: (data: PropertyFormData, images: PropertyImage[], ownerData?: OwnerData, publishToMarketplace?: boolean) => Promise<void>;
+  onSubmit: (data: PropertyFormData, images: PropertyImage[], ownerData?: OwnerData, publishToMarketplace?: boolean, asDraft?: boolean) => Promise<void>;
   isSubmitting: boolean;
   prefillData?: Record<string, any> | null;
 }
@@ -126,6 +127,7 @@ export function PropertyForm({ open, onOpenChange, property, onSubmit, isSubmitt
   const [images, setImages] = useState<PropertyImage[]>([]);
   const [activeTab, setActiveTab] = useState("basic");
   const [publishToMarketplace, setPublishToMarketplace] = useState(false);
+  const [showUnsavedDialog, setShowUnsavedDialog] = useState(false);
 
   const form = useForm<FormData>({
     resolver: zodResolver(propertySchema),
@@ -227,7 +229,7 @@ export function PropertyForm({ open, onOpenChange, property, onSubmit, isSubmitt
     return null;
   };
 
-  const handleSubmit = async (data: FormData) => {
+  const buildPropertyData = (data: FormData) => {
     const { owner_name, owner_phone, owner_email, owner_document, owner_notes, area_useful, sale_price_financed, ...restData } = data;
     const selectedType = propertyTypes.find(t => t.id === restData.property_type_id);
     const autoTitle = [selectedType?.name, restData.address_neighborhood, restData.address_city].filter(Boolean).join(' - ') || 'Imóvel sem título';
@@ -236,8 +238,31 @@ export function PropertyForm({ open, onOpenChange, property, onSubmit, isSubmitt
       name: owner_name, phone: owner_phone || undefined, email: owner_email || undefined,
       document: owner_document || undefined, notes: owner_notes || undefined,
     } : undefined;
-    await onSubmit(propertyData as PropertyFormData, images, ownerData, publishToMarketplace);
+    return { propertyData, ownerData };
+  };
+
+  const handleSubmit = async (data: FormData) => {
+    const { propertyData, ownerData } = buildPropertyData(data);
+    await onSubmit({ ...propertyData, is_draft: false } as PropertyFormData, images, ownerData, publishToMarketplace, false);
     onOpenChange(false);
+  };
+
+  // Salva o estado atual como rascunho, sem validação obrigatória.
+  const handleSaveAsDraft = async () => {
+    const { propertyData, ownerData } = buildPropertyData(form.getValues());
+    // Rascunho nunca publica no marketplace automaticamente.
+    await onSubmit({ ...propertyData, is_draft: true } as PropertyFormData, images, ownerData, false, true);
+    setShowUnsavedDialog(false);
+    onOpenChange(false);
+  };
+
+  // Intercepta o fechamento do dialog: pergunta sobre rascunho se houver alterações.
+  const handleRequestClose = (next: boolean) => {
+    if (!next && (form.formState.isDirty || images.length > 0)) {
+      setShowUnsavedDialog(true);
+      return;
+    }
+    onOpenChange(next);
   };
 
   const handleInvalidSubmit = () => {
@@ -256,7 +281,7 @@ export function PropertyForm({ open, onOpenChange, property, onSubmit, isSubmitt
   };
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
+    <Dialog open={open} onOpenChange={handleRequestClose}>
       <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>{property ? "Editar Imóvel" : "Novo Imóvel"}</DialogTitle>
@@ -303,7 +328,7 @@ export function PropertyForm({ open, onOpenChange, property, onSubmit, isSubmitt
                 </Label>
               </div>
               <div className="flex gap-2">
-                <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>Cancelar</Button>
+                <Button type="button" variant="outline" onClick={() => handleRequestClose(false)}>Cancelar</Button>
                 <Button type="submit" disabled={isSubmitting}>
                   {isSubmitting && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
                   {property ? "Salvar Alterações" : "Cadastrar Imóvel"}
@@ -313,6 +338,14 @@ export function PropertyForm({ open, onOpenChange, property, onSubmit, isSubmitt
           </form>
         </Form>
       </DialogContent>
+      <UnsavedChangesDialog
+        open={showUnsavedDialog}
+        entityLabel="imóvel"
+        isSaving={isSubmitting}
+        onSaveDraft={handleSaveAsDraft}
+        onDiscard={() => { setShowUnsavedDialog(false); onOpenChange(false); }}
+        onKeepEditing={() => setShowUnsavedDialog(false)}
+      />
     </Dialog>
   );
 }

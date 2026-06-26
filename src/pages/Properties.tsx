@@ -427,6 +427,16 @@ export default function Properties() {
     return sortedProperties.slice(start, start + pageSize);
   }, [sortedProperties, pageSize, currentPage]);
 
+  // Separar rascunhos dos imóveis salvos (seções distintas na listagem)
+  const draftProperties = useMemo(
+    () => paginatedProperties.filter((p) => (p as PropertyWithDetails).is_draft),
+    [paginatedProperties]
+  );
+  const savedProperties = useMemo(
+    () => paginatedProperties.filter((p) => !(p as PropertyWithDetails).is_draft),
+    [paginatedProperties]
+  );
+
   // Reset page when filters change
   useEffect(() => { setCurrentPage(1); }, [filters]);
 
@@ -524,9 +534,9 @@ export default function Properties() {
     }
   }, [editingProperty, updateProperty, createProperty, publishToMarketplace]);
 
-  const handleFormSubmit = async (data: PropertyFormData, images: PropertyImage[], ownerData?: { name?: string; phone?: string; email?: string; document?: string; notes?: string }, publishMarketplace?: boolean) => {
-    // Only check duplicates for new properties (not edits)
-    if (!editingProperty) {
+  const handleFormSubmit = async (data: PropertyFormData, images: PropertyImage[], ownerData?: { name?: string; phone?: string; email?: string; document?: string; notes?: string }, publishMarketplace?: boolean, asDraft?: boolean) => {
+    // Rascunhos não passam por verificação de duplicidade (dados ainda incompletos)
+    if (!editingProperty && !asDraft) {
       const street = (data as any).address_street;
       const number = (data as any).address_number;
       if (street) {
@@ -681,38 +691,102 @@ export default function Properties() {
         {!isLoading && paginatedProperties.length > 0 && (
           <>
             {viewMode === "grid" && (
-              <div className="grid gap-4 sm:gap-6 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
-                {paginatedProperties.map((property) => (
-                  <SelectablePropertyCard
-                    key={property.id}
-                    property={property}
-                    isSelected={selectedIds.has(property.id)}
-                    isSelectionMode={isSelectionMode}
-                    onSelect={handleSelectProperty}
-                    onEdit={handleEditClick}
-                    onDelete={handleDeleteClick}
-                    isPublished={publishedIds.has(property.id)}
-                    onLongPressSelect={handleLongPressSelect}
-                  />
-                ))}
+              <div className="space-y-6">
+                {draftProperties.length > 0 && (
+                  <section>
+                    <h2 className="mb-3 flex items-center gap-2 text-base font-semibold text-muted-foreground">
+                      Imóveis Rascunhos
+                      <span className="rounded-full bg-amber-500/15 px-2 py-0.5 text-xs font-medium text-amber-600">
+                        {draftProperties.length}
+                      </span>
+                    </h2>
+                    <div className="grid gap-4 sm:gap-6 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+                      {draftProperties.map((property) => (
+                        <SelectablePropertyCard
+                          key={property.id}
+                          property={property}
+                          isSelected={selectedIds.has(property.id)}
+                          isSelectionMode={isSelectionMode}
+                          onSelect={handleSelectProperty}
+                          onEdit={handleEditClick}
+                          onDelete={handleDeleteClick}
+                          isPublished={publishedIds.has(property.id)}
+                          onLongPressSelect={handleLongPressSelect}
+                        />
+                      ))}
+                    </div>
+                  </section>
+                )}
+                <section>
+                  {draftProperties.length > 0 && (
+                    <h2 className="mb-3 text-base font-semibold text-muted-foreground">Imóveis Salvos</h2>
+                  )}
+                  <div className="grid gap-4 sm:gap-6 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+                    {savedProperties.map((property) => (
+                      <SelectablePropertyCard
+                        key={property.id}
+                        property={property}
+                        isSelected={selectedIds.has(property.id)}
+                        isSelectionMode={isSelectionMode}
+                        onSelect={handleSelectProperty}
+                        onEdit={handleEditClick}
+                        onDelete={handleDeleteClick}
+                        isPublished={publishedIds.has(property.id)}
+                        onLongPressSelect={handleLongPressSelect}
+                      />
+                    ))}
+                  </div>
+                </section>
               </div>
             )}
 
             {viewMode === "list" && (
-              <div className="flex flex-col gap-2">
-                {paginatedProperties.map((property) => (
-                  <PropertyListItem
-                    key={property.id}
-                    property={property}
-                    isSelected={selectedIds.has(property.id)}
-                    isSelectionMode={isSelectionMode}
-                    onSelect={handleSelectProperty}
-                    onEdit={handleEditClick}
-                    onDelete={handleDeleteClick}
-                    onDuplicate={(id) => navigate(`/imoveis/${id}?duplicate=true`)}
-                    isPublished={publishedIds.has(property.id)}
-                  />
-                ))}
+              <div className="space-y-6">
+                {draftProperties.length > 0 && (
+                  <section>
+                    <h2 className="mb-3 flex items-center gap-2 text-base font-semibold text-muted-foreground">
+                      Imóveis Rascunhos
+                      <span className="rounded-full bg-amber-500/15 px-2 py-0.5 text-xs font-medium text-amber-600">
+                        {draftProperties.length}
+                      </span>
+                    </h2>
+                    <div className="flex flex-col gap-2">
+                      {draftProperties.map((property) => (
+                        <PropertyListItem
+                          key={property.id}
+                          property={property}
+                          isSelected={selectedIds.has(property.id)}
+                          isSelectionMode={isSelectionMode}
+                          onSelect={handleSelectProperty}
+                          onEdit={handleEditClick}
+                          onDelete={handleDeleteClick}
+                          onDuplicate={(id) => navigate(`/imoveis/${id}?duplicate=true`)}
+                          isPublished={publishedIds.has(property.id)}
+                        />
+                      ))}
+                    </div>
+                  </section>
+                )}
+                <section>
+                  {draftProperties.length > 0 && (
+                    <h2 className="mb-3 text-base font-semibold text-muted-foreground">Imóveis Salvos</h2>
+                  )}
+                  <div className="flex flex-col gap-2">
+                    {savedProperties.map((property) => (
+                      <PropertyListItem
+                        key={property.id}
+                        property={property}
+                        isSelected={selectedIds.has(property.id)}
+                        isSelectionMode={isSelectionMode}
+                        onSelect={handleSelectProperty}
+                        onEdit={handleEditClick}
+                        onDelete={handleDeleteClick}
+                        onDuplicate={(id) => navigate(`/imoveis/${id}?duplicate=true`)}
+                        isPublished={publishedIds.has(property.id)}
+                      />
+                    ))}
+                  </div>
+                </section>
               </div>
             )}
 
